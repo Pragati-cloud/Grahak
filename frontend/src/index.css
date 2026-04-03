@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-headline: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-surface: #FFFDF0;
+  --color-on-surface: #1A1A1A;
+  --color-primary: #FFC107;
+  --color-primary-dim: #E0A800;
+  --color-secondary: #FF5722;
+  --color-accent: #B71C1C;
+  --color-surface-container: #FDF5E6;
+  --color-surface-container-low: #FFF9C4;
+  --color-outline-variant: #E0E0E0;
+}
+
+@layer base {
+  body {
+    @apply bg-surface text-on-surface font-body;
+  }
+}
+
+.editorial-shadow {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+}
+
+.signature-gradient {
+  background: linear-gradient(135deg, #FFC107 0%, #FF5722 100%);
+}
+
+.mandala-bg {
+  background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M50 0c27.614 0 50 22.386 50 50s-22.386 50-50 50S0 77.614 0 50 22.386 0 50 0zm0 10c-22.091 0-40 17.909-40 40s17.909 40 40 40 40-17.909 40-40-17.909-40-40-40zm0 10c16.569 0 30 13.431 30 30s-13.431 30-30 30-30-13.431-30-30 13.431-30 30-30zm0 10c-11.046 0-20 8.954-20 20s8.954 20 20 20 20-8.954 20-20-8.954-20-20-20z' fill='%23FFC107' fill-opacity='0.05' fill-rule='evenodd'/%3E%3C/svg%3E");
+}
+
+.hero-gradient {
+  background: linear-gradient(to right, #FFC107 0%, #FFD54F 100%);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #FFC107;
+  border-radius: 10px;
+}
