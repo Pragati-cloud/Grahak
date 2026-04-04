@@ -16,7 +16,6 @@ import paymentRoutes from "./routes/payment.js";
 import mongoose from "mongoose";
 import ttsRoutes from "./routes/tts.js";
 
-
 dotenv.config();
 
 const app = express();
@@ -58,14 +57,32 @@ function toObjectId(id) {
 // Rotates every 30 seconds. Validates current + previous window (±30s clock skew).
 // Planned upgrade: HMAC-SHA256(secret, timeWindow.toString())
 // ─────────────────────────────────────────────
+function validateQRToken(scannedToken, secret) {
+  const parts = scannedToken.split(".");
+  if (parts.length !== 3) return { valid: false, reason: "Malformed token" };
 
+  const [tokenDeviceId, tokenTimestamp, signature] = parts;
 
-// Accepts tokens up to MAX_AGE_SECONDS old.
-// 90s covers: scan → browse → submit flow comfortably.
-// Increase to 120s if users report false rejections on slow networks.
-const MAX_AGE_SECONDS = 90;
-const DEVICE_SECRET = process.env.DEVICE_SECRET || "SUPER_SECRET_KEY";
-const DEVICE_ID = process.env.DEVICE_ID || "ESP001";
+  const tokenTime = parseInt(tokenTimestamp, 10);
+  if (isNaN(tokenTime))
+    return { valid: false, reason: "Invalid timestamp" };
+
+  const age = Math.floor(Date.now() / 1000) - tokenTime;
+  if (age < 0) return { valid: false, reason: "Token from the future" };
+  if (age > 90) return { valid: false, reason: `Token expired (${age}s old)` };
+
+  const fullSig = crypto
+    .createHash("sha1")
+    .update(secret + tokenDeviceId + tokenTimestamp + secret)
+    .digest("hex");
+
+  const expectedSig = fullSig.substring(0, 16);  // match ESP truncation
+
+  if (expectedSig !== signature)
+    return { valid: false, reason: "Signature mismatch" };
+
+  return { valid: true, deviceId: tokenDeviceId };
+}
 
 function generateQRToken(secret) {
   const timeWindow = Math.floor(Date.now() / 1000 / 30);
@@ -386,181 +403,105 @@ app.get("/api/devices/:device_id/qr-token", async (req, res) => {
 });
 
 
-// ─────────────────────────────────────────────
-// QR VALIDATION  (matches ESP8266 token format)
-// Token: "deviceId.timestamp.sha1(secret + deviceId + timestamp + secret)"
-// Accepts tokens up to 90s old to cover scan → browse → submit flow
-// ─────────────────────────────────────────────
-
-// const MAX_AGE_SECONDS = 90;
-
-function validateQRToken(scannedToken, secret) {
-  const parts = scannedToken.split(".");
-  if (parts.length !== 3) return { valid: false, reason: "Malformed token" };
-
-  const [tokenDeviceId, tokenTimestamp, signature] = parts;
-
-  const tokenTime = parseInt(tokenTimestamp, 10);
-  if (isNaN(tokenTime))
-    return { valid: false, reason: "Invalid timestamp in token" };
-
-  const age = Math.floor(Date.now() / 1000) - tokenTime;
-  if (age < 0)
-    return { valid: false, reason: "Token is from the future" };
-  if (age > MAX_AGE_SECONDS)
-    return { valid: false, reason: `Token expired (age: ${age}s, max: ${MAX_AGE_SECONDS}s)` };
-
-  const fullSig     = crypto
-    .createHash("sha1")
-    .update(secret + tokenDeviceId + tokenTimestamp + secret)
-    .digest("hex");
-
-  // ✅ Truncate to 16 chars to match ESP's: fullSig.substring(0, 16)
-  const expectedSig = fullSig.substring(0, 16);
-
-  if (expectedSig !== signature)
-    return { valid: false, reason: "Signature mismatch" };
-
-  return { valid: true, deviceId: tokenDeviceId };
-}
-
-
 // ═════════════════════════════════════════════
+// CORE: PLACE ORDER
 // POST /api/place-order
-//
-// Body:
-// {
-//   "shop_id": "abc123",              ← parsed from URL by frontend
-//   "encrypted_qr": "ESP001.17753...", ← parsed from URL by frontend
-//   "user": { "name": "Rahul" },
-//   "payment": { "type": "cash", "amount": 150 },
-//   "products": [
-//     { "product_id": "abc123", "quantity": 2 }
-//   ]
-// }
+// Customer calls this after QR scan + payment
 // ═════════════════════════════════════════════
 app.post("/api/place-order", async (req, res) => {
   try {
-    const { shop_id, encrypted_qr, user, payment, products } = req.body;
+    const {
+      device_id,
+      user_id,
+      encrypted_qr,    // TOTP-style token scanned from QR
+      product_ids,     // array of product _id strings
+      quantities,      // parallel array of quantities
+      payment_token,   // token from /api/verify or /api/orders/cash
+      payment_method,  // "online" | "cash"
+    } = req.body;
 
-    // ── 1. Required fields ────────────────────────────────────────
-    if (!shop_id)
-      return res.status(400).json({ error: "shop_id is required" });
-    if (!encrypted_qr)
-      return res.status(400).json({ error: "encrypted_qr is required" });
-    if (!user?.name)
-      return res.status(400).json({ error: "user.name is required" });
-    if (!payment?.type || !payment?.amount)
-      return res.status(400).json({ error: "payment.type and payment.amount are required" });
-    if (!Array.isArray(products) || products.length === 0)
-      return res.status(400).json({ error: "products must be a non-empty array" });
-
-    const invalidProduct = products.find(p => !p.product_id || !p.quantity || p.quantity < 1);
-    if (invalidProduct)
-      return res.status(400).json({ error: "Each product needs product_id and quantity >= 1" });
-
-    // ── 2. Look up shop — get secret from it ──────────────────────
-    const shopOid = toObjectId(shop_id);
-    if (!shopOid)
-      return res.status(400).json({ error: "Invalid shop_id" });
-
-    const shop = await col("shops").findOne({ _id: shopOid });
-    if (!shop)
-      return res.status(404).json({ error: "Shop not found" });
-
-    // secret is stored on the shop document (set when vendor registers device)
-    // shop.device_secret must match what's flashed on the ESP for this shop
-    // if (!shop.device_secret)
-    //   return res.status(500).json({ error: "Shop has no device secret configured" });
-
-    // ── 3. Validate QR token using shop's secret ──────────────────
-    const qrResult = validateQRToken(encrypted_qr, "SECRET_KEY");
-    if (!qrResult.valid) {
-      return res.status(401).json({ error: "Invalid or expired QR token", reason: qrResult.reason });
+    if (!device_id || !user_id || !encrypted_qr || !product_ids || !quantities) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+    if (product_ids.length !== quantities.length) {
+      return res.status(400).json({ error: "product_ids and quantities must be the same length" });
+    }
+    if (!payment_token) {
+      return res.status(402).json({ error: "Payment token is required" });
     }
 
-    // ── 4. Validate payment type ──────────────────────────────────
-    if (!["cash", "online"].includes(payment.type))
-      return res.status(400).json({ error: "payment.type must be 'cash' or 'online'" });
+    // Step 1: Look up device (need secret for QR validation)
+    const deviceOid = toObjectId(device_id);
+    if (!deviceOid) return res.status(400).json({ error: "Invalid device_id" });
 
-    // ── 5. Fetch and validate products (must belong to this shop) ─
-    const productOids = products.map(p => toObjectId(p.product_id)).filter(Boolean);
-    if (productOids.length !== products.length)
-      return res.status(400).json({ error: "One or more product_id values are invalid" });
+    const device = await col("devices").findOne({ _id: deviceOid });
+    if (!device) return res.status(404).json({ error: "Device not found" });
 
-    const dbProducts = await col("products")
-      .find({ _id: { $in: productOids }, shop_id: shopOid, available: true })
+    // Step 2: Validate QR token — current and previous 30s window
+    if (!validateQRToken("SECRET_KEY", encrypted_qr)) {
+      return res.status(401).json({ error: "Invalid or expired QR token" });
+    }
+
+    // Step 3: Validate product IDs and confirm they belong to this shop
+    const productOids = product_ids.map(toObjectId).filter(Boolean);
+    if (productOids.length !== product_ids.length) {
+      return res.status(400).json({ error: "One or more product IDs are invalid" });
+    }
+
+    const products = await col("products")
+      .find({ _id: { $in: productOids }, shop_id: device.shop_id })
       .toArray();
 
-    if (dbProducts.length !== products.length) {
-      const foundIds = dbProducts.map(p => p._id.toString());
-      const missing  = products
-        .filter(p => !foundIds.includes(p.product_id))
-        .map(p => p.product_id);
-      return res.status(404).json({ error: "Some products not found or unavailable", missing });
+    if (products.length !== product_ids.length) {
+      return res.status(400).json({ error: "One or more products do not belong to this shop" });
     }
 
-    // ── 6. Calculate total and build line items ───────────────────
+    // Step 4: Calculate total amount (in paise)
     const productMap = {};
-    dbProducts.forEach(p => { productMap[p._id.toString()] = p; });
+    products.forEach(p => { productMap[p._id.toString()] = p; });
 
-    let calculated_total = 0;
-    const lineItems = products.map(({ product_id, quantity }) => {
-      const p = productMap[product_id];
-      calculated_total += p.price * quantity;
-      return {
-        product_id: toObjectId(product_id),
-        name:       p.name,
-        unit_price: p.price,
-        quantity,
-        subtotal:   p.price * quantity,
-      };
-    });
+    let total_amount = 0;
+    for (let i = 0; i < product_ids.length; i++) {
+      total_amount += productMap[product_ids[i]].price * quantities[i];
+    }
 
-    // ── 7. Insert order ───────────────────────────────────────────
+    // Step 5: Insert Order document
     const orderResult = await col("orders").insertOne({
-      shop_id:   shopOid,
-      device_id: qrResult.deviceId,   // "ESP001" — extracted from token itself
-      user: {
-        name:       user.name,
-        device_key: req.headers["x-device-key"] || null,
-      },
-      payment: {
-        type:               payment.type,
-        amount_requested:   payment.amount,
-        amount_calculated:  calculated_total,
-      },
-      status:     "PLACED",
+      shop_id: device.shop_id,
+      device_id: device._id,
+      user_id,
+      status: "PLACED",
+      payment_method: payment_method || "online",
+      payment_token,
+      total_amount,
       created_at: new Date(),
     });
     const order_id = orderResult.insertedId;
 
-    // ── 8. Insert order items ─────────────────────────────────────
-    await col("order_items").insertMany(
-      lineItems.map(item => ({ order_id, ...item }))
-    );
+    // Step 6: Insert order_items (one per product)
+    const itemDocs = product_ids.map((pid, i) => ({
+      order_id,
+      product_id: toObjectId(pid),
+      quantity: quantities[i],
+    }));
+    await col("order_items").insertMany(itemDocs);
 
-    // ── 9. Emit to vendor dashboard ───────────────────────────────
+    // Step 7: Fetch full order + enriched items for socket emit
+    const order = await col("orders").findOne({ _id: order_id });
+    const items = await col("order_items")
+      .aggregate([
+        { $match: { order_id } },
+        { $lookup: { from: "products", localField: "product_id", foreignField: "_id", as: "product" } },
+        { $unwind: "$product" },
+        { $project: { quantity: 1, "product.name": 1, "product.price": 1 } },
+      ])
+      .toArray();
+
+    // Step 8: Emit live event to vendor dashboard
     const io = req.app.get("io");
-    io.to(`shop_${shopOid}`).emit("new_order", {
-      order_id,
-      shop_id:    shopOid,
-      device_id:  qrResult.deviceId,
-      user:       { name: user.name },
-      payment:    { type: payment.type, amount: calculated_total },
-      items:      lineItems,
-      status:     "PLACED",
-      created_at: new Date(),
-    });
+    io.to(`shop_${device.shop_id}`).emit("new_order", { order, items });
 
-    res.status(201).json({
-      status:   "success",
-      message:  "Order placed successfully",
-      order_id,
-      total:    calculated_total,
-      items:    lineItems,
-    });
-
+    res.status(201).json({ status: "success", message: "Order placed successfully", order_id, total_amount });
   } catch (error) {
     console.error("Error placing order:", error);
     res.status(500).json({ error: "Failed to place order", message: error.message });
@@ -716,51 +657,6 @@ app.get("/api/orders/:order_id/queue-position", async (req, res) => {
   }
 });
 
-
-
-// ─────────────────────────────────────────────
-// Replicates ESP8266 signing logic exactly:
-//   message   = deviceId + timestamp
-//   signature = sha1(secret + message + secret)
-//   token     = deviceId + "." + timestamp + "." + signature
-// ─────────────────────────────────────────────
-
-function verifyESPToken(secret, deviceId, token) {
-  const parts = token.split(".");
-  if (parts.length !== 3) {
-    return { valid: false, reason: "Malformed token" };
-  }
-
-  const [tokenDeviceId, timestampStr, receivedSignature] = parts;
-
-  if (tokenDeviceId !== deviceId) {
-    return { valid: false, reason: "Device ID mismatch" };
-  }
-
-  const timestamp = parseInt(timestampStr, 10);
-  if (isNaN(timestamp)) {
-    return { valid: false, reason: "Invalid timestamp" };
-  }
-
-  const now = Math.floor(Date.now() / 1000);
-  if (Math.abs(now - timestamp) > 60) {
-    return { valid: false, reason: "Token expired" };
-  }
-
-  const message = deviceId + timestampStr;
-  const expected = crypto
-    .createHash("sha1")
-    .update(secret + message + secret)
-    .digest("hex");
-
-  if (receivedSignature !== expected) {
-    return { valid: false, reason: "Signature mismatch" };
-  }
-
-  return { valid: true };
-}
-
-// ─────────────────────────────────────────────
 
 // ═════════════════════════════════════════════
 // HTTP SERVER + SOCKET.IO

@@ -6,20 +6,24 @@ import PaymentMethod from '../components/checkout/PaymentMethod';
 import SuccessPage from '../pages/SuccessPage';
 import CancelPage from '../pages/CancelPage';
 
-const CheckoutPage = ({ cart, onRemove, onClear, onComplete }) => {
+const CheckoutPage = ({ cart, apiUrl, shopId, deviceId, onAdd, onSubtract, onRemove, onClear, onComplete, coins, onOrderComplete }) => {
   const [step, setStep] = useState('summary'); // summary, method, success, failure
   const [paymentMethod, setPaymentMethod] = useState('online'); // online, cash
   const [token, setToken] = useState('');
   const [error, setError] = useState('');
+  const [applyCoins, setApplyCoins] = useState(false);
   
-  const total = useMemo(() => cart.reduce((acc, item) => acc + item.price, 0), [cart]);
+  const total = useMemo(() => cart.reduce((acc, item) => acc + (item.price * (item.quantity || 1)), 0), [cart]);
+  const maxDiscount = Math.floor(coins / 100);
+  const discountAmount = applyCoins ? Math.min(maxDiscount, total - 1) : 0; // retain at least 1rs charge
+  const finalTotal = Math.max(1, total - discountAmount);
 
   const handleRazorpayPayment = async () => {
     try {
-      const response = await fetch('/api/orders', {
+      const response = await fetch(`${apiUrl}/api/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: total, currency: 'INR' }),
+        body: JSON.stringify({ amount: finalTotal, currency: 'INR' }),
       });
       const order = await response.json();
 
@@ -38,14 +42,14 @@ const CheckoutPage = ({ cart, onRemove, onClear, onComplete }) => {
         image: 'https://picsum.photos/seed/spice/200',
         order_id: order.id,
         handler: async function (response) {
-          const verifyRes = await fetch('/api/verify', {
+          const verifyRes = await fetch(`${apiUrl}/api/verify`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
-              amount: total,
+              amount: finalTotal,
               currency: 'INR',
             }),
           });
@@ -90,10 +94,10 @@ const CheckoutPage = ({ cart, onRemove, onClear, onComplete }) => {
     }
     
     try {
-      const response = await fetch('/api/orders/cash', {
+      const response = await fetch(`${apiUrl}/api/orders/cash`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: total, currency: 'INR' }),
+        body: JSON.stringify({ amount: finalTotal, currency: 'INR' }),
       });
       const data = await response.json();
       console.log('Cash Order Response:', data);
@@ -130,10 +134,17 @@ const CheckoutPage = ({ cart, onRemove, onClear, onComplete }) => {
         {step === 'summary' && (
           <CheckoutSummary 
             cart={cart} 
+            onAdd={onAdd}
+            onSubtract={onSubtract}
             onRemove={onRemove} 
             onClear={onClear} 
             onNext={() => setStep('method')} 
             total={total} 
+            coins={coins || 0}
+            applyCoins={applyCoins}
+            setApplyCoins={setApplyCoins}
+            discountAmount={discountAmount}
+            finalTotal={finalTotal}
           />
         )}
 
@@ -151,6 +162,12 @@ const CheckoutPage = ({ cart, onRemove, onClear, onComplete }) => {
             token={token} 
             paymentMethod={paymentMethod} 
             cart={cart}
+            apiUrl={apiUrl}
+            shopId={shopId}
+            deviceId={deviceId}
+            finalTotal={finalTotal}
+            onOrderComplete={onOrderComplete}
+            coinsRedeemed={applyCoins ? (discountAmount * 100) : 0}
             onReturn={() => { onClear(); onComplete(); }} 
           />
         )}

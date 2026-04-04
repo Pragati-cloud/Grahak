@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Menu, X, ShoppingBag } from 'lucide-react';
 
-const Header = ({ onNavigate, cartCount, currentPage, user, onLogout }) => {
+const Header = ({ onNavigate, cartCount, currentPage, user, onLogout, coins }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -21,13 +21,20 @@ const Header = ({ onNavigate, cartCount, currentPage, user, onLogout }) => {
               <Menu size={24} />
             </button>
             <nav className="hidden md:flex gap-8 items-center">
-              <button onClick={() => onNavigate('home')} className={`${currentPage === 'home' ? 'text-primary border-b-2 border-primary-container' : 'text-on-surface'} font-headline tracking-tight font-bold`}>The Gallery</button>
+              <button onClick={() => onNavigate('home')} className={`${currentPage === 'home' ? 'text-primary border-b-2 border-primary-container' : 'text-on-surface'} font-headline tracking-tight font-bold`}>Menu</button>
+              <button onClick={() => onNavigate('store')} className={`${currentPage === 'store' ? 'text-primary border-b-2 border-primary-container' : 'text-on-surface'} font-headline tracking-tight font-bold`}>Store Info</button>
             </nav>
           </div>
           <h1 onClick={() => onNavigate('home')} className="text-xl md:text-2xl font-headline font-black tracking-tighter text-on-surface uppercase text-center cursor-pointer">
             Spice Haven
           </h1>
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3 md:gap-6">
+            {coins > 0 && (
+               <div className="flex items-center gap-1 md:gap-1.5 bg-orange-50 text-[#e85d04] px-2 py-0.5 md:px-3 md:py-1 rounded-full border border-orange-200 cursor-help" title="100 Coins = ₹1 Discount">
+                  <span className="text-sm md:text-lg">🪙</span>
+                  <span className="font-bold text-xs md:text-sm">{coins}</span>
+               </div>
+            )}
             {!user ? (
               <button 
                 onClick={() => onNavigate('auth')} 
@@ -81,7 +88,8 @@ const Header = ({ onNavigate, cartCount, currentPage, user, onLogout }) => {
                 </div>
                 <nav className="space-y-4">
                   {[
-                    { label: 'The Gallery', page: 'home' },
+                    { label: 'Menu', page: 'home' },
+                    { label: 'Store Info', page: 'store' },
                     { label: 'Your Selection', page: 'checkout' },
                   ].map((item) => (
                     <button 
