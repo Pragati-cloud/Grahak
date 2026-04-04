@@ -6,17 +6,17 @@ import PaymentMethod from '../components/checkout/PaymentMethod';
 import SuccessPage from '../pages/SuccessPage';
 import CancelPage from '../pages/CancelPage';
 
-const CheckoutPage = ({ cart, onRemove, onClear, onComplete }) => {
+const CheckoutPage = ({ cart, apiUrl, shopId, deviceId, onAdd, onSubtract, onRemove, onClear, onComplete }) => {
   const [step, setStep] = useState('summary'); // summary, method, success, failure
   const [paymentMethod, setPaymentMethod] = useState('online'); // online, cash
   const [token, setToken] = useState('');
   const [error, setError] = useState('');
   
-  const total = useMemo(() => cart.reduce((acc, item) => acc + item.price, 0), [cart]);
+  const total = useMemo(() => cart.reduce((acc, item) => acc + (item.price * (item.quantity || 1)), 0), [cart]);
 
   const handleRazorpayPayment = async () => {
     try {
-      const response = await fetch('/api/orders', {
+      const response = await fetch(`${apiUrl}/api/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: total, currency: 'INR' }),
@@ -38,7 +38,7 @@ const CheckoutPage = ({ cart, onRemove, onClear, onComplete }) => {
         image: 'https://picsum.photos/seed/spice/200',
         order_id: order.id,
         handler: async function (response) {
-          const verifyRes = await fetch('/api/verify', {
+          const verifyRes = await fetch(`${apiUrl}/api/verify`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -90,7 +90,7 @@ const CheckoutPage = ({ cart, onRemove, onClear, onComplete }) => {
     }
     
     try {
-      const response = await fetch('/api/orders/cash', {
+      const response = await fetch(`${apiUrl}/api/orders/cash`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: total, currency: 'INR' }),
@@ -130,6 +130,8 @@ const CheckoutPage = ({ cart, onRemove, onClear, onComplete }) => {
         {step === 'summary' && (
           <CheckoutSummary 
             cart={cart} 
+            onAdd={onAdd}
+            onSubtract={onSubtract}
             onRemove={onRemove} 
             onClear={onClear} 
             onNext={() => setStep('method')} 
@@ -151,6 +153,9 @@ const CheckoutPage = ({ cart, onRemove, onClear, onComplete }) => {
             token={token} 
             paymentMethod={paymentMethod} 
             cart={cart}
+            apiUrl={apiUrl}
+            shopId={shopId}
+            deviceId={deviceId}
             onReturn={() => { onClear(); onComplete(); }} 
           />
         )}

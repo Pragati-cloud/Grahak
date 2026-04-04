@@ -1,9 +1,9 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Trash2, CreditCard } from 'lucide-react';
+import { Trash2, CreditCard, Plus, Minus } from 'lucide-react';
 import SpicinessIndicator from '../SpicinessIndicator';
 
-const CheckoutSummary = ({ cart, onRemove, onClear, onNext, total }) => {
+const CheckoutSummary = ({ cart, onAdd, onSubtract, onRemove, onClear, onNext, total }) => {
   return (
     <motion.div 
       key="summary" 
@@ -26,7 +26,16 @@ const CheckoutSummary = ({ cart, onRemove, onClear, onNext, total }) => {
               <h4 className="font-headline font-bold text-sm sm:text-base">{item.title}</h4>
               <p className="text-sm text-accent font-bold">₹{item.price}</p>
             </div>
-            <button onClick={() => onRemove(idx)} className="text-error hover:bg-error/10 p-2 rounded-full transition-colors">
+            <div className="flex items-center gap-2 bg-surface-container-low rounded-full px-2 py-1">
+              <button onClick={() => onSubtract(item)} className="p-1 hover:bg-surface-container rounded-full text-on-surface/60 transition-colors">
+                <Minus size={14} />
+              </button>
+              <span className="font-bold text-sm min-w-[20px] text-center">{item.quantity || 1}</span>
+              <button onClick={() => onAdd(item)} className="p-1 hover:bg-surface-container rounded-full text-on-surface/60 transition-colors">
+                <Plus size={14} />
+              </button>
+            </div>
+            <button onClick={() => onRemove(item)} className="text-error hover:bg-error/10 p-2 rounded-full transition-colors ml-2">
               <Trash2 size={18} />
             </button>
           </div>

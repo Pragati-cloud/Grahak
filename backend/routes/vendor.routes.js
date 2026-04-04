@@ -40,9 +40,14 @@ router.get("/status", requireAuth, async (req, res) => {
 // Admin: Approve Vendor Endpoint
 router.post("/approve/:vendorId", requireAuth, requireRole(["admin"]), approveVendor);
 
+import { getInsights } from "../controllers/insights.controller.js";
+
 // Strict Protected Vendor Dashboard Route - Returns 403 unless approved!
 router.get("/dashboard", requireAuth, requireVendorApproved, (req, res) => {
   res.json({ message: "Welcome to the real vendor dashboard!", vendor: req.vendor });
 });
+
+// AI Insights Route
+router.get("/ai-insights", requireAuth, requireVendorApproved, getInsights);
 
 export default router;

@@ -47,7 +47,7 @@ const HomePage = ({ menuItems, onAddToCart }) => {
                 <p className="text-[10px] uppercase tracking-widest font-bold text-accent mb-3">Found {filteredItems.length} items</p>
                 <div className="space-y-3">
                   {filteredItems.slice(0, 5).map(item => (
-                    <div key={item.id} className="flex items-center gap-3 cursor-pointer hover:bg-accent/5 p-2 rounded-lg transition-colors" onClick={() => onAddToCart(item)}>
+                    <div key={item._id || item.id || item.title} className="flex items-center gap-3 cursor-pointer hover:bg-accent/5 p-2 rounded-lg transition-colors" onClick={() => onAddToCart(item)}>
                       <img src={item.image} className="w-12 h-12 rounded-lg object-cover" />
                       <div>
                         <p className="font-headline font-bold text-sm">{item.title}</p>
@@ -113,7 +113,7 @@ const HomePage = ({ menuItems, onAddToCart }) => {
               </div>
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-3 sm:gap-x-12 gap-y-6 sm:gap-y-16">
                 {appetizers.map(item => (
-                  <motion.div layout key={item.id} className="group cursor-pointer" onClick={() => onAddToCart(item)}>
+                  <motion.div layout key={item._id || item.id || item.title} className="group cursor-pointer" onClick={() => onAddToCart(item)}>
                     <div className="relative overflow-hidden rounded-xl mb-2 sm:mb-6 aspect-square sm:aspect-[4/3] bg-surface-container">
                       <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     </div>
@@ -147,7 +147,7 @@ const HomePage = ({ menuItems, onAddToCart }) => {
                 </div>
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-8">
                   {mains.map(item => (
-                    <motion.div layout key={item.id} onClick={() => onAddToCart(item)} className="bg-white p-2 sm:p-8 rounded-xl editorial-shadow group hover:-translate-y-2 transition-transform duration-300 cursor-pointer flex flex-col h-full">
+                    <motion.div layout key={item._id || item.id || item.title} onClick={() => onAddToCart(item)} className="bg-white p-2 sm:p-8 rounded-xl editorial-shadow group hover:-translate-y-2 transition-transform duration-300 cursor-pointer flex flex-col h-full">
                       <div className="overflow-hidden rounded-lg aspect-square sm:aspect-[16/10] mb-2 sm:mb-6 bg-surface-container">
                         <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                       </div>
@@ -179,7 +179,7 @@ const HomePage = ({ menuItems, onAddToCart }) => {
               </div>
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-8">
                 {sides.map(item => (
-                  <motion.div layout key={item.id} onClick={() => onAddToCart(item)} className="p-2 sm:p-8 rounded-xl border border-outline-variant/10 hover:border-secondary/40 transition-all hover:bg-white/50 cursor-pointer group">
+                  <motion.div layout key={item._id || item.id || item.title} onClick={() => onAddToCart(item)} className="p-2 sm:p-8 rounded-xl border border-outline-variant/10 hover:border-secondary/40 transition-all hover:bg-white/50 cursor-pointer group">
                     <div className="overflow-hidden rounded-lg aspect-square mb-2 sm:mb-4">
                       <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
                     </div>
@@ -209,7 +209,7 @@ const HomePage = ({ menuItems, onAddToCart }) => {
                   const IconMap = { Coffee, GlassWater, Droplets };
                   const Icon = IconMap[item.icon] || Coffee;
                   return (
-                    <motion.div layout key={item.id} onClick={() => onAddToCart(item)} className="p-2 sm:p-8 rounded-xl border border-outline-variant/10 hover:border-secondary/40 transition-all hover:bg-white/50 cursor-pointer group">
+                    <motion.div layout key={item._id || item.id || item.title} onClick={() => onAddToCart(item)} className="p-2 sm:p-8 rounded-xl border border-outline-variant/10 hover:border-secondary/40 transition-all hover:bg-white/50 cursor-pointer group">
                       <Icon className="text-secondary mb-2 sm:mb-4 group-hover:scale-110 transition-transform" size={24} />
                       <h4 className="text-base sm:text-xl font-headline font-bold mb-1 sm:mb-2 truncate">{item.title}</h4>
                       <p className="hidden sm:block text-on-surface/60 font-body text-sm mb-4">{item.description}</p>

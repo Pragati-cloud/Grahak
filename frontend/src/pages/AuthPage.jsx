@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, Mail, Lock, ArrowRight, UserPlus, LogIn, X } from 'lucide-react';
 
-export default function AuthPage({ onComplete }) {
+export default function AuthPage({ apiUrl, onComplete }) {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
@@ -13,7 +13,7 @@ export default function AuthPage({ onComplete }) {
     setError('');
     setLoading(true);
 
-    const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+    const endpoint = isLogin ? `${apiUrl}/api/auth/login` : `${apiUrl}/api/auth/register`;
     
     try {
       const res = await fetch(endpoint, {
