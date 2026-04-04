@@ -25,6 +25,20 @@ export default function App() {
     const saved = localStorage.getItem('spice_haven_coins');
     return saved ? parseInt(saved, 10) : 0;
   });
+<<<<<<< HEAD:frontend/frontend/src/App.jsx
+
+  const handleOrderComplete = (earned, redeemed) => {
+    setCoins(prev => {
+      const newBalance = Math.max(0, prev - redeemed) + earned;
+      localStorage.setItem('spice_haven_coins', newBalance);
+      if (earned > 0) {
+        setTimeout(() => setToast(`You earned ${earned} coins (₹${(earned/100).toFixed(2)})!`), 2000);
+      }
+      return newBalance;
+    });
+  };
+=======
+>>>>>>> b33bd63835335a9c29ca0cb3f34fc80734a49608:frontend/src/App.jsx
 
   const handleOrderComplete = (earned, redeemed) => {
     setCoins(prev => {
@@ -37,7 +51,10 @@ export default function App() {
     });
   };
 
-  const [shopId, setShopId] = useState("69d0d18cc7cde5669b3585ad");
+  const [shopId, setShopId] = useState(() => {
+    const p = window.location.pathname.split('/').filter(Boolean);
+    return p.length >= 2 ? p[0] : "69d0d18cc7cde5669b3585ad";
+  });
   const [deviceId, setDeviceId] = useState(null);
   
   // Using Render production backend explicitly
@@ -46,7 +63,7 @@ export default function App() {
   useEffect(() => {
     const initApp = async () => {
       try {
-        const currentShopId = "69d0d18cc7cde5669b3585ad";
+        const currentShopId = shopId;
         
         // 1. Get Devices
         let currentDeviceId = localStorage.getItem('qrdine_device_id');
