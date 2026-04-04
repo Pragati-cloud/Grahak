@@ -43,6 +43,40 @@ async function connectDB() {
 connectDB().catch((err) => console.error("MongoDB connection error:", err));
 
 
+// Helper: get a collection by name
+const col = (name) => db.collection(name);
+
+// Helper: safely parse an ObjectId — returns null if invalid
+function toObjectId(id) {
+  try { return new ObjectId(id); } catch { return null; }
+}
+
+
+// ─────────────────────────────────────────────
+// QR VALIDATION UTILITY (TOTP-style)
+// Rotates every 30 seconds. Validates current + previous window (±30s clock skew).
+// Planned upgrade: HMAC-SHA256(secret, timeWindow.toString())
+// ─────────────────────────────────────────────
+function validateQRToken(secret, scannedToken) {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const currentWindow = Math.floor(nowSeconds / 30);
+  const previousWindow = currentWindow - 1;
+  return [`${secret}-${currentWindow}`, `${secret}-${previousWindow}`].includes(scannedToken);
+}
+
+function generateQRToken(secret) {
+  const timeWindow = Math.floor(Date.now() / 1000 / 30);
+  return `${secret}-${timeWindow}`;
+}
+
+
+// ─────────────────────────────────────────────
+// Razorpay Instance
+// ─────────────────────────────────────────────
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID || "YOUR_KEY_ID",
+  key_secret: process.env.RAZORPAY_KEY_SECRET || "YOUR_KEY_SECRET",
+});
 
 
 // ─────────────────────────────────────────────
@@ -54,16 +88,21 @@ app.use("/api/menus", menuRoutes);
 app.use("/api/orders-db", orderRoutes);
 app.use("/api/payments", paymentRoutes);
 
+app.use("/api/tts", ttsRoutes);
+
+
+// ═════════════════════════════════════════════
+// EXISTING: Razorpay Order Creation
+// POST /api/orders
+// ═════════════════════════════════════════════
 app.post("/api/orders", async (req, res) => {
   try {
     const { amount, currency } = req.body;
-    const options = {
-      amount: amount * 100, // amount in smallest currency unit (paise)
+    const order = await razorpay.orders.create({
+      amount: amount * 100,
       currency: currency || "INR",
       receipt: `receipt_${Date.now()}`,
-    };
-
-    const order = await razorpay.orders.create(options);
+    });
     res.status(200).json(order);
   } catch (error) {
     console.error("Error creating Razorpay order:", error);
@@ -71,72 +110,66 @@ app.post("/api/orders", async (req, res) => {
   }
 });
 
+
+// ═════════════════════════════════════════════
+// EXISTING: Razorpay Payment Verification
+// POST /api/verify
+// ═════════════════════════════════════════════
 app.post("/api/verify", async (req, res) => {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, amount, currency } = req.body;
 
-    const body = razorpay_order_id + "|" + razorpay_payment_id;
     const expectedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || "YOUR_KEY_SECRET")
-      .update(body.toString())
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest("hex");
 
-    if (expectedSignature === razorpay_signature) {
-      // Generate Token using uuid with fallback
-      let token;
-      try {
-        const prefix = 'SH-ON-';
-        token = prefix + uuidv4().split('-')[0].toUpperCase() + '-' + uuidv4().split('-')[1].toUpperCase();
-      } catch (e) {
-        console.error("UUID generation failed, using fallback:", e);
-        const prefix = 'SH-ON-';
-        token = prefix + Math.random().toString(36).substr(2, 4).toUpperCase() + '-' + Math.random().toString(36).substr(2, 4).toUpperCase();
-      }
-
-      // Save payment to MongoDB
-      const newPayment = new TempPayment({
-        razorpay_order_id,
-        razorpay_payment_id,
-        razorpay_signature,
-        amount,
-        currency,
-        token,
-        status: "success",
-      });
-      
-      if (mongoose.connection.readyState === 1) {
-        await newPayment.save();
-      } else {
-        console.warn("MongoDB not connected, skipping save but returning token.");
-      }
-
-      res.status(200).json({ status: 'success', message: 'Payment verified successfully', token });
-    } else {
-      res.status(400).json({ status: "failure", message: "Invalid signature" });
+    if (expectedSignature !== razorpay_signature) {
+      return res.status(400).json({ status: "failure", message: "Invalid signature" });
     }
+
+    let token;
+    try {
+      token = "SH-ON-" + uuidv4().split("-")[0].toUpperCase() + "-" + uuidv4().split("-")[1].toUpperCase();
+    } catch {
+      token = "SH-ON-" + Math.random().toString(36).substr(2, 4).toUpperCase() + "-" + Math.random().toString(36).substr(2, 4).toUpperCase();
+    }
+
+    await col("temp_payments").insertOne({
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      amount,
+      currency,
+      token,
+      status: "success",
+      createdAt: new Date(),
+    });
+
+    res.status(200).json({ status: "success", message: "Payment verified successfully", token });
   } catch (error) {
     console.error("Error verifying payment:", error);
     res.status(500).json({ error: "Verification failed" });
   }
 });
 
+
+// ═════════════════════════════════════════════
+// EXISTING: Cash Order
+// POST /api/orders/cash
+// ═════════════════════════════════════════════
 app.post("/api/orders/cash", async (req, res) => {
   try {
     const { amount, currency } = req.body;
-    
-    // Generate Token using uuid with fallback
+
     let token;
     try {
-      const prefix = 'SH-CS-';
-      token = prefix + uuidv4().split('-')[0].toUpperCase() + '-' + uuidv4().split('-')[1].toUpperCase();
-    } catch (e) {
-      console.error("UUID generation failed, using fallback:", e);
-      const prefix = 'SH-CS-';
-      token = prefix + Math.random().toString(36).substr(2, 4).toUpperCase() + '-' + Math.random().toString(36).substr(2, 4).toUpperCase();
+      token = "SH-CS-" + uuidv4().split("-")[0].toUpperCase() + "-" + uuidv4().split("-")[1].toUpperCase();
+    } catch {
+      token = "SH-CS-" + Math.random().toString(36).substr(2, 4).toUpperCase() + "-" + Math.random().toString(36).substr(2, 4).toUpperCase();
     }
 
-    // Save order to MongoDB (using the same schema but status 'cash')
-    const newPayment = new TempPayment({
+    await col("temp_payments").insertOne({
       razorpay_order_id: "CASH_" + Date.now(),
       razorpay_payment_id: "CASH_" + Date.now(),
       razorpay_signature: "CASH_" + Date.now(),
@@ -144,21 +177,16 @@ app.post("/api/orders/cash", async (req, res) => {
       currency: currency || "INR",
       token,
       status: "cash",
+      createdAt: new Date(),
     });
 
-    if (mongoose.connection.readyState === 1) {
-      await newPayment.save();
-    } else {
-      console.warn("MongoDB not connected, skipping save but returning token.");
-    }
-
-    res.status(200).json({ status: 'success', token });
+    res.status(200).json({ status: "success", token });
   } catch (error) {
     console.error("Error creating cash order:", error);
-    res.status(500).json({ 
-      error: "Failed to process cash order", 
+    res.status(500).json({
+      error: "Failed to process cash order",
       message: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
     });
   }
 });

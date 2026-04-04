@@ -14,27 +14,42 @@ const SuccessPage = ({ token, paymentMethod, cart, apiUrl, shopId, deviceId, onR
 
     const dispatchToDB = async () => {
       try {
-        const productIds = cart.map(item => item._id || item.id);
-        const quantities = cart.map(item => item.quantity || 1);
+        // Extract Shop ID and Token dynamically from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlShopId = urlParams.get('shopId') || shopId; // fallback to props if not in URL
+        const encryptedToken = urlParams.get('token') || "missing_token";
+
+        // Map cart to the new requested schema format
+        const formattedProducts = cart.map(item => ({
+             product_id: item._id || item.id,
+             quantity: item.quantity || 1
+        }));
         
-        let userId = "customer_9876543210";
+        // Grab username or fallback
+        let userName = "Guest";
         try {
           const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
-          if (userData.phone) userId = userData.phone;
+          if (userData.name) userName = userData.name;
+          else if (userData.phone) userName = userData.phone;
         } catch (e) {}
+
+        const paymentAmount = cart.reduce((acc, item) => acc + (item.price * (item.quantity || 1)), 0);
+
+        // Build the precise payload
+        const payload = {
+          shopId: urlShopId,
+          encryptedToken: encryptedToken,
+          user: { name: userName },
+          payment: { type: paymentMethod, amount: paymentAmount },
+          products: formattedProducts
+        };
+
+        console.log("🚀 Placing order with mapped schema:", JSON.stringify(payload, null, 2));
 
         const response = await fetch(`${apiUrl}/api/place-order`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            device_id: deviceId,
-            user_id: userId,
-            encrypted_qr: "direct_order", // No QR code anymore
-            product_ids: productIds,
-            quantities: quantities,
-            payment_token: token,
-            payment_method: paymentMethod
-          })
+          body: JSON.stringify(payload)
         });
         
         const data = await response.json();
