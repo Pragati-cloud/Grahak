@@ -14,10 +14,21 @@ const SuccessPage = ({ token, paymentMethod, cart, apiUrl, shopId, deviceId, fin
 
     const dispatchToDB = async () => {
       try {
-        // Extract Shop ID and Token dynamically from URL
+        const parts = window.location.pathname.split('/').filter(Boolean);
         const urlParams = new URLSearchParams(window.location.search);
-        const urlShopId = urlParams.get('shopId') || shopId; // fallback to props if not in URL
-        const encryptedToken = urlParams.get('token') || "missing_token";
+        
+        let urlShopId = shopId;
+        let encryptedToken = "missing_token";
+        
+        if (parts.length >= 2) {
+          urlShopId = parts[0];
+          encryptedToken = parts[1];
+        } else if (urlParams.get('shopId') || urlParams.get('token')) {
+          urlShopId = urlParams.get('shopId') || shopId;
+          encryptedToken = urlParams.get('token') || "missing_token";
+        } else if (token) {
+          encryptedToken = token;
+        }
 
         // Map cart to the new requested schema format
         const formattedProducts = cart.map(item => ({

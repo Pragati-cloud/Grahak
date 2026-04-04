@@ -37,7 +37,10 @@ export default function App() {
     });
   };
 
-  const [shopId, setShopId] = useState("69d0d18cc7cde5669b3585ad");
+  const [shopId, setShopId] = useState(() => {
+    const p = window.location.pathname.split('/').filter(Boolean);
+    return p.length >= 2 ? p[0] : "69d0d18cc7cde5669b3585ad";
+  });
   const [deviceId, setDeviceId] = useState(null);
   
   // Using Render production backend explicitly
@@ -46,7 +49,7 @@ export default function App() {
   useEffect(() => {
     const initApp = async () => {
       try {
-        const currentShopId = "69d0d18cc7cde5669b3585ad";
+        const currentShopId = shopId;
         
         // 1. Get Devices
         let currentDeviceId = localStorage.getItem('qrdine_device_id');
