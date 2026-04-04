@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { Trash2, CreditCard, Plus, Minus } from 'lucide-react';
 import SpicinessIndicator from '../SpicinessIndicator';
 
-const CheckoutSummary = ({ cart, onAdd, onSubtract, onRemove, onClear, onNext, total }) => {
+const CheckoutSummary = ({ cart, onAdd, onSubtract, onRemove, onClear, onNext, total, coins, applyCoins, setApplyCoins, discountAmount, finalTotal }) => {
   return (
     <motion.div 
       key="summary" 
@@ -41,10 +41,37 @@ const CheckoutSummary = ({ cart, onAdd, onSubtract, onRemove, onClear, onNext, t
           </div>
         ))}
       </div>
+      <div className="border border-accent/20 rounded-2xl p-4 mb-4 bg-white shadow-sm flex justify-between items-center">
+        <div>
+          <p className="font-bold text-sm text-gray-800">Your Coins</p>
+          <p className="text-xs text-gray-500">🪙 {coins} coins available (₹{Math.floor(coins/100)} off)</p>
+        </div>
+        {coins >= 100 && (
+          <button 
+            onClick={() => setApplyCoins(!applyCoins)}
+            className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${applyCoins ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          >
+            {applyCoins ? 'Applied' : 'Redeem'}
+          </button>
+        )}
+      </div>
+
       <div className="border-t border-accent/20 pt-4 flex flex-col sm:flex-row justify-between items-center sm:items-end gap-4 mb-8">
-        <div className="text-center sm:text-left">
-          <p className="text-[10px] sm:text-xs uppercase tracking-widest font-bold text-on-surface/40 mb-1">Total Order Value</p>
-          <p className="text-3xl sm:text-4xl font-headline font-black text-accent">₹{total.toFixed(2)}</p>
+        <div className="text-center sm:text-left w-full sm:w-auto">
+          <div className="flex justify-between sm:block opacity-60 text-xs font-bold mb-1">
+            <span>Subtotal:</span>
+            <span className="sm:inline hidden ml-2">₹{total.toFixed(2)}</span>
+            <span className="sm:hidden">₹{total.toFixed(2)}</span>
+          </div>
+          {applyCoins && discountAmount > 0 && (
+            <div className="flex justify-between sm:block text-green-600 text-xs font-bold mb-1">
+              <span>Coin Discount:</span>
+              <span className="sm:inline hidden ml-2">- ₹{discountAmount.toFixed(2)}</span>
+              <span className="sm:hidden">- ₹{discountAmount.toFixed(2)}</span>
+            </div>
+          )}
+          <p className="text-[10px] sm:text-xs uppercase tracking-widest font-bold text-on-surface/40 mb-1 mt-2">Total Order Value</p>
+          <p className="text-3xl sm:text-4xl font-headline font-black text-accent">₹{finalTotal.toFixed(2)}</p>
         </div>
         <button 
           onClick={onNext} 

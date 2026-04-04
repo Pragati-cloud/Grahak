@@ -7,6 +7,7 @@ import Toast from './components/Toast';
 import HomePage from './pages/HomePage';
 import CheckoutPage from './pages/CheckoutPage';
 import AuthPage from './pages/AuthPage';
+import StoreDetailPage from './pages/StoreDetailPage';
 
 // --- Main App ---
 
@@ -19,6 +20,22 @@ export default function App() {
   const [menuItems, setMenuItems] = useState([]);
   const [cart, setCart] = useState([]);
   const [toast, setToast] = useState(null);
+  
+  const [coins, setCoins] = useState(() => {
+    const saved = localStorage.getItem('spice_haven_coins');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+
+  const handleOrderComplete = (earned, redeemed) => {
+    setCoins(prev => {
+      const newBalance = Math.max(0, prev - redeemed) + earned;
+      localStorage.setItem('spice_haven_coins', newBalance);
+      if (earned > 0) {
+        setTimeout(() => setToast(`You earned ${earned} coins (₹${(earned/100).toFixed(2)})!`), 2000);
+      }
+      return newBalance;
+    });
+  };
 
   const [shopId, setShopId] = useState("69d0d18cc7cde5669b3585ad");
   const [deviceId, setDeviceId] = useState(null);
@@ -157,6 +174,7 @@ export default function App() {
           setUser(null);
           setToast("Logged out successfully");
         }}
+        coins={coins}
       />
       
       <main className="min-h-[80vh]">
@@ -175,6 +193,8 @@ export default function App() {
               onSubtract={handleSubtractFromCart}
               onRemove={handleRemoveFromCart} 
               onClear={() => setCart([])}
+              coins={coins}
+              onOrderComplete={handleOrderComplete}
               onComplete={() => setCurrentPage('home')}
             />
           )}
@@ -189,6 +209,12 @@ export default function App() {
                 }
                 setCurrentPage('home');
               }}
+            />
+          )}
+          {currentPage === 'store' && (
+            <StoreDetailPage 
+              key="store" 
+              onMenuClick={() => setCurrentPage('home')}
             />
           )}
         </AnimatePresence>

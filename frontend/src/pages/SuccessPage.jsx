@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { CheckCircle2, Home, Loader2 } from 'lucide-react'; 
 
-const SuccessPage = ({ token, paymentMethod, cart, apiUrl, shopId, deviceId, onReturn }) => {
+const SuccessPage = ({ token, paymentMethod, cart, apiUrl, shopId, deviceId, finalTotal, onOrderComplete, coinsRedeemed, onReturn }) => {
   const [orderId, setOrderId] = useState(null);
   const [error, setError] = useState(null);
   const dispatchAttempted = useRef(false);
@@ -33,7 +33,7 @@ const SuccessPage = ({ token, paymentMethod, cart, apiUrl, shopId, deviceId, onR
           else if (userData.phone) userName = userData.phone;
         } catch (e) {}
 
-        const paymentAmount = cart.reduce((acc, item) => acc + (item.price * (item.quantity || 1)), 0);
+        const paymentAmount = finalTotal;
 
         // Build the precise payload
         const payload = {
@@ -57,6 +57,10 @@ const SuccessPage = ({ token, paymentMethod, cart, apiUrl, shopId, deviceId, onR
         if (data.order_id) {
           console.log('🚀 Order successfully placed via Live API:', data);
           setOrderId(data.order_id);
+          
+          // Loyalty: 5% back in coins (1 Rs = 5 coins. 100 coins = 1 Rs discount, so 5% value)
+          const coinsEarned = Math.floor(finalTotal * 5);
+          if (onOrderComplete) onOrderComplete(coinsEarned, coinsRedeemed || 0);
           
           // Auto-return to home after 10 seconds following a successful order
           setTimeout(() => {
