@@ -13,6 +13,8 @@ import vendorRoutes from "./routes/vendor.routes.js";
 import menuRoutes from "./routes/menu.js";
 import orderRoutes from "./routes/order.js";
 import paymentRoutes from "./routes/payment.js";
+import mongoose from "mongoose";
+import ttsRoutes from "./routes/tts.js";
 
 dotenv.config();
 
@@ -34,6 +36,7 @@ let db;
 
 async function connectDB() {
   await client.connect();
+  await mongoose.connect(MONGODB_URI);
   db = client.db(DB_NAME);
   console.log(`✅ Connected to MongoDB — database: ${DB_NAME}`);
 }
@@ -83,6 +86,8 @@ app.use("/api/vendor", vendorRoutes);
 app.use("/api/menus", menuRoutes);
 app.use("/api/orders-db", orderRoutes);
 app.use("/api/payments", paymentRoutes);
+
+app.use("/api/tts", ttsRoutes);
 
 
 // ═════════════════════════════════════════════
