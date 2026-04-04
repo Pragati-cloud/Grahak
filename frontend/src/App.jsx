@@ -19,6 +19,7 @@ export default function App() {
   const [menuItems, setMenuItems] = useState([]);
   const [cart, setCart] = useState([]);
   const [toast, setToast] = useState(null);
+  
 
   useEffect(() => {
     const fetchMenu = async () => {
