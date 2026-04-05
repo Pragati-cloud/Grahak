@@ -25,21 +25,6 @@ export default function App() {
     const saved = localStorage.getItem('spice_haven_coins');
     return saved ? parseInt(saved, 10) : 0;
   });
-<<<<<<< HEAD:frontend/frontend/src/App.jsx
-
-  const handleOrderComplete = (earned, redeemed) => {
-    setCoins(prev => {
-      const newBalance = Math.max(0, prev - redeemed) + earned;
-      localStorage.setItem('spice_haven_coins', newBalance);
-      if (earned > 0) {
-        setTimeout(() => setToast(`You earned ${earned} coins (₹${(earned/100).toFixed(2)})!`), 2000);
-      }
-      return newBalance;
-    });
-  };
-=======
->>>>>>> b33bd63835335a9c29ca0cb3f34fc80734a49608:frontend/src/App.jsx
-
   const handleOrderComplete = (earned, redeemed) => {
     setCoins(prev => {
       const newBalance = Math.max(0, prev - redeemed) + earned;

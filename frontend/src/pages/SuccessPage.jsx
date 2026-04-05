@@ -26,9 +26,10 @@ const SuccessPage = ({ token, paymentMethod, cart, customerName, apiUrl, shopId,
         } else if (urlParams.get('shopId') || urlParams.get('token')) {
           urlShopId = urlParams.get('shopId') || shopId;
           encryptedToken = urlParams.get('token') || "missing_token";
-        } else if (token) {
-          encryptedToken = token;
         }
+        
+        // Note: We purposely do NOT fallback to the CheckoutPage 'token' prop anymore 
+        // because that token is the Payment Gateway token (SH-CS-...), NOT the hardware QR token.
 
         // Map cart to the new requested schema format
         const formattedProducts = cart.map(item => ({
