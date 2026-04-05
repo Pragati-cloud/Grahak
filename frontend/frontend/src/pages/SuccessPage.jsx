@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { CheckCircle2, Home, Loader2 } from 'lucide-react'; 
 
-const SuccessPage = ({ token, paymentMethod, cart, apiUrl, shopId, deviceId, finalTotal, onOrderComplete, coinsRedeemed, onReturn }) => {
+const SuccessPage = ({ token, paymentMethod, cart, customerName, apiUrl, shopId, deviceId, finalTotal, onOrderComplete, coinsRedeemed, onReturn }) => {
   const [orderId, setOrderId] = useState(null);
   const [error, setError] = useState(null);
   const dispatchAttempted = useRef(false);
@@ -36,19 +36,16 @@ const SuccessPage = ({ token, paymentMethod, cart, apiUrl, shopId, deviceId, fin
              quantity: item.quantity || 1
         }));
         
-        // Grab username or fallback
-        let userName = "Guest";
-        try {
-          const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
-          if (userData.name) userName = userData.name;
-          else if (userData.phone) userName = userData.phone;
-        } catch (e) {}
+        let userName = customerName || "Guest";
 
         const paymentAmount = finalTotal;
 
         // Build the precise payload
         const payload = {
+          shop_id: urlShopId,
           shopId: urlShopId,
+          encrypted_qr: encryptedToken, // Added to resolve "encrypted_qr is required"
+          token: encryptedToken,
           encryptedToken: encryptedToken,
           user: { name: userName },
           payment: { type: paymentMethod, amount: paymentAmount },
@@ -79,7 +76,10 @@ const SuccessPage = ({ token, paymentMethod, cart, apiUrl, shopId, deviceId, fin
           }, 10000);
         } else {
           console.error('Failed to place order:', data);
-          setError("Failed to generate order ID");
+          // Show the exact error string from the backend instead of "Failed to generate order ID"
+          let serverError = data.error || data.message || "Unknown error occurred";
+          if (typeof serverError === 'object') serverError = JSON.stringify(serverError);
+          setError(serverError);
         }
       } catch (e) {
         console.error('Order Submission Error:', e);

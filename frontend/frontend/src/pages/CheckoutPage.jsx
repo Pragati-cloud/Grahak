@@ -12,6 +12,12 @@ const CheckoutPage = ({ cart, apiUrl, shopId, deviceId, onAdd, onSubtract, onRem
   const [token, setToken] = useState('');
   const [error, setError] = useState('');
   const [applyCoins, setApplyCoins] = useState(false);
+  const [customerName, setCustomerName] = useState(() => {
+    try {
+      const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
+      return userData.name || '';
+    } catch { return ''; }
+  });
   
   const total = useMemo(() => cart.reduce((acc, item) => acc + (item.price * (item.quantity || 1)), 0), [cart]);
   const maxDiscount = Math.floor(coins / 100);
@@ -64,7 +70,7 @@ const CheckoutPage = ({ cart, apiUrl, shopId, deviceId, onAdd, onSubtract, onRem
           }
         },
         prefill: {
-          name: 'Arjun Kapoor',
+          name: customerName || 'Arjun Kapoor',
           email: 'arjun@example.com',
           contact: '9999999999',
         },
@@ -152,6 +158,8 @@ const CheckoutPage = ({ cart, apiUrl, shopId, deviceId, onAdd, onSubtract, onRem
           <PaymentMethod 
             paymentMethod={paymentMethod} 
             setPaymentMethod={setPaymentMethod} 
+            customerName={customerName}
+            setCustomerName={setCustomerName}
             onBack={() => setStep('summary')} 
             onProcess={handleProcessOrder} 
           />
@@ -162,6 +170,7 @@ const CheckoutPage = ({ cart, apiUrl, shopId, deviceId, onAdd, onSubtract, onRem
             token={token} 
             paymentMethod={paymentMethod} 
             cart={cart}
+            customerName={customerName}
             apiUrl={apiUrl}
             shopId={shopId}
             deviceId={deviceId}

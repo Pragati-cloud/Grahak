@@ -2,7 +2,8 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, CreditCard, Utensils } from 'lucide-react';
 
-const PaymentMethod = ({ paymentMethod, setPaymentMethod, onBack, onProcess }) => {
+const PaymentMethod = ({ paymentMethod, setPaymentMethod, customerName, setCustomerName, onBack, onProcess }) => {
+  const isNameEmpty = !customerName || customerName.trim() === '';
   return (
     <motion.div 
       key="method" 
@@ -36,9 +37,21 @@ const PaymentMethod = ({ paymentMethod, setPaymentMethod, onBack, onProcess }) =
           </div>
         </button>
       </div>
+      <div className="mb-8">
+        <label className="block text-sm font-bold text-gray-700 mb-2">Customer Name</label>
+        <input 
+          type="text" 
+          placeholder="Please enter your full name" 
+          value={customerName} 
+          onChange={(e) => setCustomerName(e.target.value)} 
+          className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-secondary transition-colors font-body"
+        />
+        {isNameEmpty && <p className="text-xs text-red-500 mt-2">* Name is required to place order</p>}
+      </div>
       <button 
         onClick={onProcess}
-        className="w-full bg-secondary text-white font-headline font-bold py-4 rounded-xl hover:bg-accent transition-all shadow-lg text-lg active:scale-95"
+        disabled={isNameEmpty}
+        className={`w-full text-white font-headline font-bold py-4 rounded-xl transition-all shadow-lg text-lg active:scale-95 ${isNameEmpty ? 'bg-gray-400 cursor-not-allowed' : 'bg-secondary hover:bg-accent'}`}
       >
         {paymentMethod === 'online' ? 'Pay with Razorpay (UPI/Card)' : 'Place Order (Cash on Delivery)'}
       </button>
